@@ -1,0 +1,11 @@
+[database]
+url = "sqlite+aiosqlite:///./users.db"
+echo = true
+
+[auth]
+valid_tokens = ["supersecrettoken123", "devtoken456"]
+require_api_token = true
+
+[ratelimit]
+max_attempts = 5
+window_seconds = 10

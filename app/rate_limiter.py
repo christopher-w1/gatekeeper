@@ -33,3 +33,11 @@ class RateLimiter:
         """
         if identifier in self.attempts:
             del self.attempts[identifier]
+            
+    def allow_attempt(self, identifier: str) -> bool:
+        """
+        Allows an attempt if the identifier is not limited.
+        If allowed, it records the attempt and returns True.
+        If limited, it returns False.
+        """
+        return not self.is_limited(identifier)

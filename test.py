@@ -16,6 +16,7 @@ test_user = {
 async def test_register_user():
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{BASE_URL}/register-user", json=test_user)
+        print(f"Response: {response.text}")  # Debugging line to see the response
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -30,6 +31,7 @@ async def test_login_user():
     }
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{BASE_URL}/login-user", json=login_data)
+        print(f"Response: {response.text}")  # Debugging line to see the response
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -47,6 +49,7 @@ async def test_get_user_data(session_token, user_id):
     }
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{BASE_URL}/get-user-data", json=get_data)
+        print(f"Response: {response.text}")  # Debugging line to see the response
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from datetime import datetime, timezone
 from models import *
@@ -20,7 +21,14 @@ require_api_token = config["auth"]["require_api_token"]
 rate_limit_conf = config["ratelimit"]
 
 # --- Setup ---
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Datenbanktabellen erstellen
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    yield
+    
+app = FastAPI(lifespan=lifespan)
 engine = create_async_engine(db_url, echo=echo_db)
 repo = UserRepository(engine)
 login_rate_limiter = RateLimiter(
@@ -28,6 +36,7 @@ login_rate_limiter = RateLimiter(
     window_seconds=rate_limit_conf["window_seconds"]
 )
 session = SessionManager(timeout=1800)
+
 
 # --- Endpoints ---
 @app.post("/register-user")
@@ -72,13 +81,18 @@ async def get_user_data(data: GetUserDataRequest):
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    user_is_active = any(session.is_session_active(token) for token in session.tokens_by_id.get(user.id, []))
+    
+    user_id = user.id
+    username = user.username
+    email = user.email
+    registered_at = user.registered_at
+    last_access = user.last_access
+    user_is_active = any(session.is_session_active(token) for token in session.tokens_by_id.get(user_id, []))
     user_data = {
-        "username": user.username,
-        "email": user.email,
-        "registered_at": user.registered_at,
-        "last_access": user.last_access,
+        "username": username,
+        "email": email,
+        "registered_at": registered_at,
+        "last_access": last_access,
         "is_active": user_is_active,
     }
 
@@ -93,15 +107,18 @@ async def login_user(data: LoginRequest):
         raise HTTPException(status_code=429, detail="Too many login attempts")
 
     user = await repo.get_user_by_email(data.email)
-    if not user or not verify_password(user.hashed_password, data.password):
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not verify_password(user.hashed_password, data.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    user_id = user.id
 
     token = str(uuid.uuid4())
-    session.create_session(token, user.id)
+    session.create_session(token, user_id)
 
     user.last_access = datetime.now(timezone.utc)
     await repo.update(user)
-    return {"status": "success", "session_token": token, "user_id": user.id, "message": "Logged in"}
+    return {"status": "success", "session_token": token, "user_id": user_id, "message": "Logged in"}
 
 @app.post("/logout-user")
 async def logout_user(data: LogoutRequest):

@@ -3,7 +3,7 @@ from os import urandom
 import re
 
 
-def hash_password(password: str, salt: str):
+def hash_password(password: str, salt=None) -> str:
     """
     Hashes the password, salts it, then hashes it again.
     """
@@ -16,7 +16,7 @@ def hash_password(password: str, salt: str):
     return f"$SHA${salt}${hashcode}"
 
 
-def generate_salt(length=16):
+def generate_salt(length=16) -> str:
     """
     Generate a random hexadecimal string of a given length
     """
@@ -28,10 +28,10 @@ def verify_password(stored_hash: str, password: str) -> bool:
     Verifies the password against the stored hash.
     """
     try:
-        _, salt, hashcode = stored_hash.split('$')
+        _, algorithm, salt, hashcode = stored_hash.split('$')
         return hash_password(password, salt) == stored_hash
     except ValueError:
-        return False  # Invalid hash format
+        return False
 
 
 def is_valid_password(password: str) -> bool:

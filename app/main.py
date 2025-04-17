@@ -5,7 +5,7 @@ from app.user_repository import UserRepository
 from rate_limiter import RateLimiter
 from utils import hash_password, verify_password, is_valid_password, is_valid_email, is_valid_username
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
+from session_manager import SessionManager
 import uuid
 import tomllib
 
@@ -27,7 +27,7 @@ login_rate_limiter = RateLimiter(
     max_attempts=rate_limit_conf["max_attempts"],
     window_seconds=rate_limit_conf["window_seconds"]
 )
-active_sessions = {}
+session = SessionManager(timeout=1800)
 
 # --- Endpoints ---
 @app.post("/register-user")
@@ -51,12 +51,11 @@ async def register_user(data: RegisterRequest):
         username=data.username,
         email=data.email,
         hashed_password=hashed_pw,
-        session_token=str(uuid.uuid4()),
     )
     await repo.save(user)
     return {"status": "success", "message": "User registered"}
 
-@app.post("/get-user-data", response_model=UserDataResponse)
+@app.post("/get-user-data")
 async def get_user_data(data: GetUserDataRequest):
     if data.api_token not in valid_tokens and require_api_token:
         raise HTTPException(status_code=401, detail="Invalid API token")
@@ -74,52 +73,84 @@ async def get_user_data(data: GetUserDataRequest):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return UserDataResponse(**user.dict())
+    user_is_active = any(session.is_session_active(token) for token in session.tokens_by_id.get(user.id, []))
+    user_data = {
+        "username": user.username,
+        "email": user.email,
+        "registered_at": user.registered_at,
+        "last_access": user.last_access,
+        "is_active": user_is_active,
+    }
+
+    return {"status": "success", "user_data": user_data}
 
 @app.post("/login-user")
 async def login_user(data: LoginRequest):
     if data.api_token not in valid_tokens and require_api_token:
         raise HTTPException(status_code=401, detail="Invalid API token")
     
+    if not login_rate_limiter.allow_attempt(data.email):
+        raise HTTPException(status_code=429, detail="Too many login attempts")
+
     user = await repo.get_user_by_email(data.email)
     if not user or not verify_password(user.hashed_password, data.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user.session_token = str(uuid.uuid4())
+    token = str(uuid.uuid4())
+    session.create_session(token, user.id)
+
     user.last_access = datetime.now(timezone.utc)
     await repo.update(user)
-    return {"status": "success", "session_token": user.session_token}
+    return {"status": "success", "session_token": token, "user_id": user.id, "message": "Logged in"}
 
 @app.post("/logout-user")
 async def logout_user(data: LogoutRequest):
     if data.api_token not in valid_tokens and require_api_token:
         raise HTTPException(status_code=401, detail="Invalid API token")
-    
-    user = await repo.get_user_by_session_token(data.session_token)
-    if not user:
+
+    if not session.is_session_active(data.session_token):
         raise HTTPException(status_code=401, detail="Invalid session token")
 
-    user.session_token = ""
-    await repo.update(user)
+    session.close_session_for_token(data.session_token)
     return {"status": "success", "message": "Logged out"}
 
 @app.post("/modify-user")
 async def modify_user(data: ModifyUserRequest):
     if data.api_token not in valid_tokens and require_api_token:
         raise HTTPException(status_code=401, detail="Invalid API token")
-    
-    user = await repo.get_user_by_session_token(data.session_token)
-    if not user:
+
+    if not session.is_session_active(data.session_token):
         raise HTTPException(status_code=401, detail="Invalid session token")
 
+    user_id = session.tokens[data.session_token]["user_id"]
+    user = await repo.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     if data.username:
+        if not is_valid_username(data.username):
+            raise HTTPException(status_code=400, detail="Invalid username format")
+        if data.username != user.username:
+            if await repo.get_user_by_username(data.username):
+                raise HTTPException(status_code=400, detail="Username already taken")
         user.username = data.username
+
+    user.username = data.username
+        
     if data.email:
+        if not is_valid_email(data.email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        if data.email != user.email:
+            if await repo.get_user_by_email(data.email):
+                raise HTTPException(status_code=400, detail="Email already registered")
         user.email = data.email
     if data.password:
+        if not is_valid_password(data.password):
+            raise HTTPException(
+                status_code=400,
+                detail="Password must be at least 7 characters long and include one uppercase letter, one lowercase letter, and one digit"
+            )
         user.hashed_password = hash_password(data.password)
-    if data.is_active is not None:
-        user.is_active = data.is_active
 
     await repo.update(user)
     return {"status": "success", "message": "User modified"}

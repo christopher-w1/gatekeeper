@@ -13,8 +13,6 @@ class UserModel(SQLModel, table=True):
     hashed_password: str
     registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_access: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    session_token: str = ""
-    is_active: bool = True
 
 # Request models
 class RegisterRequest(BaseModel):
@@ -44,13 +42,3 @@ class ModifyUserRequest(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
-    is_active: Optional[bool] = None
-
-# Response models
-class UserDataResponse(BaseModel):
-    username: str
-    email: EmailStr
-    registered_at: datetime
-    last_access: datetime
-    session_token: str
-    is_active: bool

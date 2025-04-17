@@ -1,0 +1,74 @@
+<header>
+</header>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #101010;
+        color: #ccc;
+        height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    form {
+        display: flex;
+        flex-direction: column;
+        max-width: 300px;
+        margin: auto;
+        outline: 1px solid #ccc;
+        background-color: #202020;
+        padding: 10px;
+        border-radius: 10px;
+        align-self: center;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+    input[type="email"], input[type="password"] {
+        padding: 8px;
+        margin: 5px 0;
+        border: 1px solid #777;
+        border-radius: 5px;
+        background-color: #101010;
+        color: #ccc;
+        width: 270px;
+        text-align: center;
+    }
+    button {
+        margin: 10px 0;
+        padding: 8px;
+        padding-inline: 10px;
+        width: fit-content;
+        background-color: #222;
+        color: #ccc;
+        border-radius: 5px;
+        border: 1px solid #777;
+    }
+    button:hover {
+        background-color: #333;
+    }
+    h4 {
+        color: #ccc;
+        padding-inline: 15px;
+        padding-top: 0px;
+    }
+</style>
+<main>
+    <body>
+        <form method="POST" action="/login">
+            <h4>This website requires you to be logged in.</h4>
+            <div>
+                <input type="email" id="email" name="email" placeholder="email" required>
+            </div>
+            <div>
+                <input type="password" id="password" name="password" placeholder="password" required>
+            </div>
+            <input type="hidden" name="redirect" value="{{ redirect }}">
+            {% if error %}
+                <p style="color: red;">{{ error }}</p>
+            {% endif %}
+            <button type="submit">Login</button>
+        </form>
+    </body>
+</main>

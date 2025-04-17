@@ -4,8 +4,12 @@ echo = true
 
 [auth]
 valid_tokens = ["supersecrettoken123", "devtoken456"]
-require_api_token = true
+require_api_token = false
 
 [ratelimit]
 max_attempts = 5
 window_seconds = 10
+
+[server]
+host = "0.0.0.0"
+port = 8000

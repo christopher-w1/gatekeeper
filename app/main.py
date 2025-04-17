@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from datetime import datetime, timezone
 from models import *
-from app.user_repository import UserRepository
+from user_repository import UserRepository
 from rate_limiter import RateLimiter
 from utils import hash_password, verify_password, is_valid_password, is_valid_email, is_valid_username
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -10,7 +10,7 @@ import uuid
 import tomllib
 
 # --- Load Config ---
-with open("config.toml", "rb") as f:
+with open("./app/config.toml", "rb") as f:
     config = tomllib.load(f)
 
 db_url = config["database"]["url"]
@@ -154,3 +154,10 @@ async def modify_user(data: ModifyUserRequest):
 
     await repo.update(user)
     return {"status": "success", "message": "User modified"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    host = config["server"].get("host", "127.0.0.1")
+    port = config["server"].get("port", 8000)
+    uvicorn.run("main:app", host=host, port=port, reload=False)

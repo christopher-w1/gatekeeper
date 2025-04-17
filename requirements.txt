@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+sqlalchemy[asyncio]
+aiosqlite
+passlib[bcrypt]
+email-validator
+httpx
+pytest
